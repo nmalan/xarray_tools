@@ -1,5 +1,6 @@
 from __future__ import print_function
 
+
 def xarray_trend(xarr):
     """
     Calculates the trend of the data along the 'time' dimension
@@ -120,36 +121,10 @@ def create_cartopy_axes(ax=None, lw=0.5, c='k'):
     return ca
 
 
-def regrid_unweighted(xds, lat_bins, lon_bins, how='mean'):
-    """
-    Regrid an xr.DataArray with unweighted averaging.
-    The input requires bins for lat and lon.
-    The center points are calculated from the bins
-    """
-
-    attrs = {}
-    for key in xds.data_vars:
-        attrs[key] = xds[key].attrs
-
-    lat_ctr = (lat_bins[1:] + lat_bins[:-1]) / 2
-    lon_ctr = (lon_bins[1:] + lon_bins[:-1]) / 2
-
-    lon_reg = xds.groupby_bins('lon', lon_bins, labels=lon_ctr)
-    lon_reg = getattr(lon_reg, how)('lon')
-
-    lat_reg = lon_reg.groupby_bins('lat', lat_bins, labels=lat_ctr)
-    lat_reg = getattr(lat_reg, how)('lat')
-
-    regridd = lat_reg.rename({'lon_bins': 'lon', 'lat_bins': 'lat'})
-    regridd = regridd.transpose('time', 'lat', 'lon')
-
-    for key in regridd.data_vars:
-        regridd[key].attrs = dict(attrs[key])
-
-    return regridd
-
-
 def read_netcdfs(files, dim, transform_func=None, verbose=False):
+    """
+    For when the data are too big. As suggested on the xarray readthedocs page.
+    """
     import xarray as xr
     from glob import glob
 
@@ -171,27 +146,3 @@ def read_netcdfs(files, dim, transform_func=None, verbose=False):
     datasets = [process_one_path(p, v=verbose) for p in paths]
     combined = xr.concat(datasets, dim)
     return combined
-
-
-def resample_day2mon_deg2qrt(fname, sname):
-    import numpy as np
-
-    xb = np.arange(-180, 180.1, 1)
-    yb = np.arange( -90,  90.1, 1)
-
-    print (fname, end=': ')
-    xds = read_netcdfs(fname, 'time', verbose=False)
-
-    print ('resampling', end=', ')
-    xdsM = xds.resample('1MS', 'time', keep_attrs=True)
-    xds1 = regrid_unweighted(xdsM, yb, xb, how='mean')
-
-    for key in xds1.data_vars:
-        xds[key].encoding = {'complevel': 4, 'zlib': True}
-
-    print ('saving')
-    xds1.to_netcdf(sname)
-
-    xds.close()
-    xdsM.close()
-    xds1.close()
